@@ -4,6 +4,7 @@ import { RestExecutorService } from "./rest-executor.service";
 import { SoapExecutorService } from "./soap-executor.service";
 import { VariableResolverService } from "./variable-resolver.service";
 import { PrismaService } from "../../prisma/prisma.service";
+import { EnvironmentsService } from "../../environments/environments.service";
 
 export interface UnifiedExecutionDto {
   requestId?: string; // Opcional, si la petición ya está guardada en la BD
@@ -22,6 +23,8 @@ export interface UnifiedExecutionDto {
 
   // Variables activas del entorno seleccionado
   variables?: Record<string, string>;
+  environmentId?: string;
+  workspaceId?: string;
 }
 
 @Injectable()

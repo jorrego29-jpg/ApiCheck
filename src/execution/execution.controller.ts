@@ -1,6 +1,7 @@
 // src/execution/execution.controller.ts
 import { Controller, Post, Body } from '@nestjs/common';
-import { ExecutionService, UnifiedExecutionDto } from './services/execution.service';
+import { ExecutionService } from './services/execution.service';
+import type { UnifiedExecutionDto } from './services/execution.service';
 
 @Controller('execution')
 export class ExecutionController {
