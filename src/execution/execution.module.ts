@@ -6,9 +6,10 @@ import { RestExecutorService } from './services/rest-executor.service';
 import { SoapExecutorService } from './services/soap-executor.service';
 import { VariableResolverService } from './services/variable-resolver.service';
 import { ExecutionService } from './services/execution.service';
+import { EnvironmentsModule } from '../environments/environments.module';
 
 @Module({
-  imports: [HttpModule],
+  imports: [HttpModule, EnvironmentsModule],
   controllers: [ExecutionController],
   providers: [
     RestExecutorService,
