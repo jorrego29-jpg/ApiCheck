@@ -14,7 +14,7 @@ lerna-debug.log*
 
 # AI
 .claude
-claude
+/claude
 
 # OS
 .DS_Store
