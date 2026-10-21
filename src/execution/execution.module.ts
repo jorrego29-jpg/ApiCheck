@@ -6,6 +6,7 @@ import { RestExecutorService } from './services/rest-executor.service';
 import { SoapExecutorService } from './services/soap-executor.service';
 import { VariableResolverService } from './services/variable-resolver.service';
 import { ExecutionService } from './services/execution.service';
+import { WsdlParserService } from './services/wsdl-parser.service';
 import { EnvironmentsModule } from '../environments/environments.module';
 
 @Module({
@@ -16,7 +17,8 @@ import { EnvironmentsModule } from '../environments/environments.module';
     SoapExecutorService,
     VariableResolverService,
     ExecutionService,
+    WsdlParserService,
   ],
-  exports: [ExecutionService],
+  exports: [ExecutionService, WsdlParserService],
 })
 export class ExecutionModule {}
