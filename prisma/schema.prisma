@@ -1,0 +1,117 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum ProtocolType {
+  REST
+  SOAP
+}
+
+enum HttpMethod {
+  GET
+  POST
+  PUT
+  DELETE
+  PATCH
+  HEAD
+  OPTIONS
+}
+
+model Workspace {
+  id           String        @id @default(uuid())
+  name         String
+  collections  Collection[]
+  environments Environment[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Collection {
+  id          String     @id @default(uuid())
+  name        String
+  workspaceId String
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  folders     Folder[]
+  requests    Request[]
+  createdAt   DateTime   @default(now())
+}
+
+// Soporta carpetas dentro de carpetas (Relación recursiva)
+model Folder {
+  id           String     @id @default(uuid())
+  name         String
+  collectionId String
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  
+  parentId     String?
+  parent       Folder?    @relation("FolderToFolder", fields: [parentId], references: [id], onDelete: Cascade)
+  children     Folder[]   @relation("FolderToFolder")
+
+  requests     Request[]
+  createdAt    DateTime   @default(now())
+}
+
+model Request {
+  id           String       @id @default(uuid())
+  name         String
+  protocol     ProtocolType @default(REST)
+  method       HttpMethod?  // Nulo para SOAP
+  url          String
+  headers      Json?        // [{ key: "Content-Type", value: "application/json", enabled: true }]
+  queryParams  Json?        // [{ key: "page", value: "1", enabled: true }]
+  body         Json?        // { type: "json" | "xml" | "form-data", content: "..." }
+  auth         Json?        // { type: "bearer" | "basic", config: {...} }
+  
+  // Específico para SOAP
+  soapAction   String?
+  wsdlUrl      String?
+
+  collectionId String
+  collection   Collection   @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  folderId     String?
+  folder       Folder?      @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
+  history      HistoryLog[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Environment {
+  id          String     @id @default(uuid())
+  name        String     // ej. "Development", "Production"
+  isGlobal    Boolean    @default(false)
+  workspaceId String
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  variables   Variable[]
+}
+
+model Variable {
+  id            String      @id @default(uuid())
+  key           String
+  value         String
+  enabled       Boolean     @default(true)
+  environmentId String
+  environment   Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+}
+
+model HistoryLog {
+  id           String   @id @default(uuid())
+  requestId    String?
+  request      Request? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  
+  // Datos guardados al momento del disparo
+  executedUrl  String
+  method       String
+  status       Int
+  statusText   String
+  requestHeaders  Json
+  responseHeaders Json
+  responseBody String?
+  durationMs   Int
+  sizeBytes    Int
+  createdAt    DateTime @default(now())
+}
