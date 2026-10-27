@@ -5,8 +5,8 @@ import { ExecutionController } from './execution.controller';
 import { RestExecutorService } from './services/rest-executor.service';
 import { SoapExecutorService } from './services/soap-executor.service';
 import { VariableResolverService } from './services/variable-resolver.service';
-import { ExecutionService } from './services/execution.service';
 import { WsdlParserService } from './services/wsdl-parser.service';
+import { ExecutionService } from './services/execution.service';
 import { EnvironmentsModule } from '../environments/environments.module';
 
 @Module({
@@ -16,8 +16,8 @@ import { EnvironmentsModule } from '../environments/environments.module';
     RestExecutorService,
     SoapExecutorService,
     VariableResolverService,
-    ExecutionService,
     WsdlParserService,
+    ExecutionService,
   ],
   exports: [ExecutionService, WsdlParserService],
 })
