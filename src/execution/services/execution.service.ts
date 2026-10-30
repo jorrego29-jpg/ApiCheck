@@ -5,27 +5,10 @@ import { SoapExecutorService } from "./soap-executor.service";
 import { VariableResolverService } from "./variable-resolver.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { EnvironmentsService } from "../../environments/environments.service";
+import { ExecuteRequestDto } from "../dto/execute-request.dto";
 
-export interface UnifiedExecutionDto {
-  requestId?: string; // Opcional, si la petición ya está guardada en la BD
-  protocol: "REST" | "SOAP";
-
-  // Datos de la petición (pueden venir directos del cliente o cargados desde la BD)
-  url: string;
-  method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
-  headers?: Record<string, string>;
-  queryParams?: Record<string, string>;
-  body?: any;
-
-  // Datos específicos SOAP
-  soapAction?: string;
-  wsdlUrl?: string;
-
-  // Variables activas del entorno seleccionado
-  variables?: Record<string, string>;
-  environmentId?: string;
-  workspaceId?: string;
-}
+// Alias conservado por compatibilidad: ahora el contrato vive en una clase validable.
+export type UnifiedExecutionDto = ExecuteRequestDto;
 
 @Injectable()
 export class ExecutionService {

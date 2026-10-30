@@ -31,3 +31,27 @@ export class CreateEnvironmentDto {
   @Type(() => CreateVariableDto)
   variables?: CreateVariableDto[];
 }
+
+export class UpdateEnvironmentDto {
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isGlobal?: boolean;
+}
+
+export class UpdateVariableDto {
+  @IsString()
+  @IsOptional()
+  key?: string;
+
+  @IsString()
+  @IsOptional()
+  value?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  enabled?: boolean;
+}

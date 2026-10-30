@@ -1,7 +1,7 @@
 // src/execution/execution.controller.ts
 import { Controller, Post, Get, Body, Query } from '@nestjs/common';
 import { ExecutionService } from './services/execution.service';
-import type { UnifiedExecutionDto } from './services/execution.service';
+import { ExecuteRequestDto } from './dto/execute-request.dto';
 import { WsdlParserService } from './services/wsdl-parser.service';
 
 @Controller('execution')
@@ -12,7 +12,7 @@ export class ExecutionController {
   ) {}
 
   @Post('run')
-  async runRequest(@Body() dto: UnifiedExecutionDto) {
+  async runRequest(@Body() dto: ExecuteRequestDto) {
     return await this.executionService.execute(dto);
   }
 

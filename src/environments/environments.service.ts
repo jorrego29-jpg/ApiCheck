@@ -1,7 +1,12 @@
 // src/environments/environments.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateEnvironmentDto, CreateVariableDto } from './dto/create-environment.dto';
+import {
+  CreateEnvironmentDto,
+  CreateVariableDto,
+  UpdateEnvironmentDto,
+  UpdateVariableDto,
+} from './dto/create-environment.dto';
 
 @Injectable()
 export class EnvironmentsService {
@@ -22,6 +27,7 @@ export class EnvironmentsService {
   }
 
   async findAllByWorkspace(workspaceId: string) {
+    if (!workspaceId) throw new BadRequestException('El parámetro workspaceId es obligatorio.');
     return this.prisma.environment.findMany({
       where: { workspaceId },
       include: { variables: true },
@@ -82,6 +88,31 @@ export class EnvironmentsService {
         environmentId,
       },
     });
+  }
+
+  async update(id: string, dto: UpdateEnvironmentDto) {
+    await this.findOne(id);
+    return this.prisma.environment.update({
+      where: { id },
+      data: dto,
+      include: { variables: true },
+    });
+  }
+
+  async updateVariable(variableId: string, dto: UpdateVariableDto) {
+    await this.findVariable(variableId);
+    return this.prisma.variable.update({ where: { id: variableId }, data: dto });
+  }
+
+  async removeVariable(variableId: string) {
+    await this.findVariable(variableId);
+    return this.prisma.variable.delete({ where: { id: variableId } });
+  }
+
+  private async findVariable(variableId: string) {
+    const variable = await this.prisma.variable.findUnique({ where: { id: variableId } });
+    if (!variable) throw new NotFoundException(`Variable con ID ${variableId} no encontrada.`);
+    return variable;
   }
 
   async remove(id: string) {
