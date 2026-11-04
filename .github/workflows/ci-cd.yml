@@ -1,7 +1,10 @@
 name: CI
 
 # El despliegue lo hace Vercel con su integración de GitHub (cada push a main; previews en PR).
-# Para que este CI frene de verdad un despliegue defectuoso, protege `main` exigiendo que pasen estos jobs.
+# Flujo de ramas: se trabaja en develop y se integra a main con un Pull Request develop → main.
+# En un PR, actions/checkout prueba el resultado del merge (refs/pull/N/merge), no solo la rama de origen.
+# Para que este CI frene de verdad un despliegue defectuoso, protege `main` exigiendo que pasen
+# los checks "Pruebas", "Build de producción y prueba de humo" e "Integración develop → main".
 on:
   push:
     branches: [main, develop]
@@ -18,6 +21,49 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  integracion:
+    name: Integración develop → main
+    # Solo en los PR hacia main: comprueba que la integración sea segura antes de desplegar a producción.
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: A main solo se integra desde develop (o hotfix/*)
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          case "$HEAD_REF" in
+            develop|hotfix/*) echo "Rama de origen: $HEAD_REF" ;;
+            *) echo "::error::A main solo se integra desde develop o hotfix/*; este PR viene de '$HEAD_REF'."; exit 1 ;;
+          esac
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Producción ya aplicó las migraciones de main: si se editan o borran, `prisma migrate deploy`
+      # falla o deja la base distinta del historial. Los cambios de schema van siempre en una migración nueva.
+      - name: Las migraciones de main no se modifican y las nuevas van después
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed=$(git diff --name-only --diff-filter=DMRT "$BASE_SHA...$HEAD_SHA" -- prisma/migrations)
+          if [ -n "$changed" ]; then
+            echo "::error::El PR modifica o elimina migraciones que ya están en main. Crea una migración nueva en su lugar:"
+            echo "$changed"
+            exit 1
+          fi
+          latest=$(git ls-tree -d --name-only "$BASE_SHA" prisma/migrations/ | xargs -r -n1 basename | sort | tail -n1)
+          added=$(git diff --name-only --diff-filter=A "$BASE_SHA...$HEAD_SHA" -- prisma/migrations | awk -F/ 'NF>=4 {print $3}' | sort -u)
+          for m in $added; do
+            if [ -n "$latest" ] && [[ ! "$m" > "$latest" ]]; then
+              echo "::error::La migración nueva '$m' es anterior a la última de main ('$latest'). Regenérala con prisma migrate dev."
+              exit 1
+            fi
+            echo "Migración nueva: $m"
+          done
+          echo "Migraciones correctas (última en main: ${latest:-ninguna})."
+
   test:
     name: Pruebas
     runs-on: ubuntu-latest
@@ -78,6 +124,18 @@ jobs:
       - run: npm run build
         env:
           VERCEL_ENV: production
+
+      # Si alguien cambia schema.prisma sin crear la migración, la base de producción quedaría desfasada.
+      - name: El schema coincide con las migraciones
+        run: |
+          npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code || {
+            echo "::error::schema.prisma tiene cambios sin migración. Ejecuta: npx prisma migrate dev --name <cambio>"
+            exit 1
+          }
+
+      # Todas las suites e2e: la de Prisma simulado, app.e2e-spec.ts y db.e2e-spec.ts (base real).
+      - name: Pruebas de integración con la base de datos real
+        run: npx jest --config ./test/jest-e2e.json --ci --runInBand
 
       - name: Arrancar la API compilada
         run: node dist/src/main.js > server.log 2>&1 &

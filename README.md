@@ -93,10 +93,13 @@ test/                                      pruebas e2e
 
 ## CI y despliegue
 
-- **GitHub Actions** (`.github/workflows/ci-cd.yml`) corre en cada push y PR a `main` y `develop`, con dos jobs:
-  - *Pruebas*: `npm ci`, `npm run build` (el mismo comando que ejecuta Vercel, sin generar Prisma antes) y las pruebas unitarias y e2e.
-  - *Build de producción y prueba de humo*: levanta un PostgreSQL, ejecuta el build con `VERCEL_ENV=production` (genera el cliente y aplica las migraciones en una base vacía), arranca la API compilada y ejecuta `scripts/smoke.mjs`: crea datos, ejecuta una petición REST y comprueba que quede en el historial. En local: `BASE_URL=http://127.0.0.1:3000 node scripts/smoke.mjs` con la API en marcha.
-  - Para que frenen un despliegue defectuoso, en GitHub (*Settings → Rules*) exige que pasen estos jobs antes de hacer merge a `main`.
+- **Flujo de ramas**: se trabaja en `develop` y se integra a `main` con un Pull Request `develop` → `main` (o desde `hotfix/*`). El merge a `main` es lo que despliega a producción.
+- **GitHub Actions** (`.github/workflows/ci-cd.yml`) corre en cada push y PR a `main` y `develop`. En un PR prueba el resultado del merge, no solo la rama de origen. Tiene tres jobs:
+  - *Pruebas*: `npm ci`, `npm run build` (el mismo comando que ejecuta Vercel, sin generar Prisma antes), las pruebas unitarias y las e2e con Prisma simulado.
+  - *Build de producción y prueba de humo*: levanta un PostgreSQL y ejecuta el build con `VERCEL_ENV=production` (genera el cliente y aplica las migraciones en una base vacía). Después comprueba con `prisma migrate diff` que `schema.prisma` no tenga cambios sin migración, corre todas las suites e2e contra la base real (`test/db.e2e-spec.ts` cubre cascadas, campos Json, variables de entorno e historial) y arranca la API compilada para ejecutar `scripts/smoke.mjs`.
+  - *Integración develop → main* (solo en PR hacia `main`): exige que el PR venga de `develop` o `hotfix/*`, que no se modifiquen ni borren migraciones que ya están en `main` y que las migraciones nuevas sean posteriores a la última de `main`.
+  - Para que frenen un despliegue defectuoso, en GitHub (*Settings → Rules*) protege `main` exigiendo un PR y que pasen los tres checks antes del merge.
+- **En local**, con una base migrada en `DATABASE_URL`: `npx jest --config ./test/jest-e2e.json --runInBand` (todas las e2e) y, con la API en marcha, `BASE_URL=http://127.0.0.1:3000 node scripts/smoke.mjs`.
 - **Vercel** despliega con su integración de GitHub (producción desde `main`, previews en PR), con la base de datos en Neon. Los pasos están en [DESPLIEGUE.md](DESPLIEGUE.md).
 
 > APICheck ejecuta peticiones a cualquier URL que se le indique y no tiene autenticación propia: no lo expongas públicamente sin protección.
