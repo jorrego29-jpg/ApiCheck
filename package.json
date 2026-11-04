@@ -59,6 +59,11 @@
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
   },
+  "overrides": {
+    "@nestjs/cli": {
+      "webpack": "5.112.0"
+    }
+  },
   "jest": {
     "moduleFileExtensions": [
       "js",
