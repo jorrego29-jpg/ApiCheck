@@ -1,5 +1,10 @@
-name: CI/CD
+name: CI
 
+# El despliegue lo hace Vercel con su integración de GitHub (cada push a main; previews en PR).
+# Flujo de ramas: se trabaja en develop y se integra a main con un Pull Request develop → main.
+# En un PR, actions/checkout prueba el resultado del merge (refs/pull/N/merge), no solo la rama de origen.
+# Para que este CI frene de verdad un despliegue defectuoso, protege `main` exigiendo que pasen
+# los checks "Pruebas", "Build de producción y prueba de humo" e "Integración develop → main".
 on:
   push:
     branches: [main, develop]
@@ -10,18 +15,57 @@ on:
 permissions:
   contents: read
 
-# Un mismo ref no corre dos veces a la vez; en PR se cancela la ejecución anterior, en main nunca (un deploy no se corta a medias).
+# En PR se cancela la ejecución anterior del mismo ref.
 concurrency:
-  group: ci-cd-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-env:
-  # prisma.config.ts exige DATABASE_URL al generar el cliente; las pruebas no se conectan a ninguna base.
-  DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
-
 jobs:
+  integracion:
+    name: Integración develop → main
+    # Solo en los PR hacia main: comprueba que la integración sea segura antes de desplegar a producción.
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: A main solo se integra desde develop (o hotfix/*)
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          case "$HEAD_REF" in
+            develop|hotfix/*) echo "Rama de origen: $HEAD_REF" ;;
+            *) echo "::error::A main solo se integra desde develop o hotfix/*; este PR viene de '$HEAD_REF'."; exit 1 ;;
+          esac
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Producción ya aplicó las migraciones de main: si se editan o borran, `prisma migrate deploy`
+      # falla o deja la base distinta del historial. Los cambios de schema van siempre en una migración nueva.
+      - name: Las migraciones de main no se modifican y las nuevas van después
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed=$(git diff --name-only --diff-filter=DMRT "$BASE_SHA...$HEAD_SHA" -- prisma/migrations)
+          if [ -n "$changed" ]; then
+            echo "::error::El PR modifica o elimina migraciones que ya están en main. Crea una migración nueva en su lugar:"
+            echo "$changed"
+            exit 1
+          fi
+          latest=$(git ls-tree -d --name-only "$BASE_SHA" prisma/migrations/ | xargs -r -n1 basename | sort | tail -n1)
+          added=$(git diff --name-only --diff-filter=A "$BASE_SHA...$HEAD_SHA" -- prisma/migrations | awk -F/ 'NF>=4 {print $3}' | sort -u)
+          for m in $added; do
+            if [ -n "$latest" ] && [[ ! "$m" > "$latest" ]]; then
+              echo "::error::La migración nueva '$m' es anterior a la última de main ('$latest'). Regenérala con prisma migrate dev."
+              exit 1
+            fi
+            echo "Migración nueva: $m"
+          done
+          echo "Migraciones correctas (última en main: ${latest:-ninguna})."
+
   test:
-    name: Pruebas y compilación
+    name: Pruebas
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,111 +76,75 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npx prisma generate
+
+      # Es el mismo comando que ejecuta Vercel, y a propósito no se genera el cliente de Prisma antes:
+      # si `npm run build` no lo hace él solo, aquí falla igual que fallaría el despliegue.
+      # Sin DATABASE_URL, como en un preview de Vercel sin base de datos conectada.
       - run: npm run build
+
       - run: npm test -- --ci
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
       # Solo la suite de la fase 0: app.e2e-spec.ts es la plantilla de Nest y exige una base de datos real.
       - run: npx jest --config ./test/jest-e2e.json --ci phase0-backend
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
 
-  publish:
-    name: Publicar imagen
-    needs: test
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+  smoke:
+    name: Build de producción y prueba de humo
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Pone el nombre de la imagen en minúsculas, como exige GHCR.
-      - id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository_owner }}/apicheck-api
-          tags: |
-            type=raw,value=latest
-            type=sha,format=long,prefix=sha-
-
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  deploy:
-    name: Desplegar en el VPS
-    needs: publish
-    runs-on: ubuntu-latest
-    # Con reglas de protección en este environment se puede exigir aprobación antes de desplegar.
-    environment: production
-    concurrency:
-      group: deploy-production
-      cancel-in-progress: false
-    permissions:
-      contents: read
-      packages: read
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: apicheck
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d apicheck"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
-      VPS_HOST: ${{ secrets.VPS_HOST }}
-      VPS_USER: ${{ secrets.VPS_USER }}
-      VPS_PORT: ${{ vars.VPS_PORT || '22' }}
-      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/apicheck' }}
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/apicheck?schema=public
+      DATABASE_URL_UNPOOLED: postgresql://postgres:postgres@localhost:5432/apicheck?schema=public
+      PORT: 3000
     steps:
       - uses: actions/checkout@v4
 
-      - name: Preparar SSH
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Build de producción de Vercel: genera el cliente, aplica las migraciones en una base vacía y compila.
+      - run: npm run build
         env:
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VERCEL_ENV: production
+
+      # Si alguien cambia schema.prisma sin crear la migración, la base de producción quedaría desfasada.
+      - name: El schema coincide con las migraciones
         run: |
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          cat > ~/.ssh/config <<CONFIG
-          Host vps
-            HostName ${VPS_HOST}
-            User ${VPS_USER}
-            Port ${VPS_PORT}
-            IdentityFile ~/.ssh/id_deploy
-            IdentitiesOnly yes
-            StrictHostKeyChecking yes
-          CONFIG
+          npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code || {
+            echo "::error::schema.prisma tiene cambios sin migración. Ejecuta: npx prisma migrate dev --name <cambio>"
+            exit 1
+          }
 
-      - name: Copiar compose y Caddyfile
-        run: scp deploy/docker-compose.yml deploy/Caddyfile "vps:${DEPLOY_PATH}/"
+      # Todas las suites e2e: la de Prisma simulado, app.e2e-spec.ts y db.e2e-spec.ts (base real).
+      - name: Pruebas de integración con la base de datos real
+        run: npx jest --config ./test/jest-e2e.json --ci --runInBand
 
-      - name: Entrar en el registro de imágenes
+      - name: Arrancar la API compilada
+        run: node dist/src/main.js > server.log 2>&1 &
+
+      - name: Prueba de humo
+        run: node scripts/smoke.mjs
         env:
-          GHCR_USER: ${{ github.actor }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: printf '%s' "$GHCR_TOKEN" | ssh vps "docker login ghcr.io -u '$GHCR_USER' --password-stdin"
+          BASE_URL: http://127.0.0.1:3000
 
-      - name: Migrar y reiniciar la API
-        run: |
-          ssh vps bash -s <<REMOTE
-          set -euo pipefail
-          cd '${DEPLOY_PATH}'
-          docker compose pull api
-          docker compose up -d --wait db
-          docker compose run --rm --no-deps api node_modules/.bin/prisma migrate deploy
-          docker compose up -d --wait api
-          docker compose up -d --wait caddy
-          docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
-          docker image prune -f
-          REMOTE
-
-      - name: Salir del registro
-        if: always()
-        run: ssh vps "docker logout ghcr.io" || true
+      - name: Log de la API
+        if: failure()
+        run: cat server.log
