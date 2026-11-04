@@ -1,6 +1,7 @@
 name: CI
 
 # El despliegue lo hace Vercel con su integración de GitHub (cada push a main; previews en PR).
+# Para que este CI frene de verdad un despliegue defectuoso, protege `main` exigiendo que pasen estos jobs.
 on:
   push:
     branches: [main, develop]
@@ -16,13 +17,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-env:
-  # prisma.config.ts exige DATABASE_URL al generar el cliente; las pruebas no se conectan a ninguna base.
-  DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
-
 jobs:
   test:
-    name: Pruebas y compilación
+    name: Pruebas
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,8 +30,63 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npx prisma generate
+
+      # Es el mismo comando que ejecuta Vercel, y a propósito no se genera el cliente de Prisma antes:
+      # si `npm run build` no lo hace él solo, aquí falla igual que fallaría el despliegue.
+      # Sin DATABASE_URL, como en un preview de Vercel sin base de datos conectada.
       - run: npm run build
+
       - run: npm test -- --ci
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
       # Solo la suite de la fase 0: app.e2e-spec.ts es la plantilla de Nest y exige una base de datos real.
       - run: npx jest --config ./test/jest-e2e.json --ci phase0-backend
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+
+  smoke:
+    name: Build de producción y prueba de humo
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: apicheck
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d apicheck"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/apicheck?schema=public
+      DATABASE_URL_UNPOOLED: postgresql://postgres:postgres@localhost:5432/apicheck?schema=public
+      PORT: 3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Build de producción de Vercel: genera el cliente, aplica las migraciones en una base vacía y compila.
+      - run: npm run build
+        env:
+          VERCEL_ENV: production
+
+      - name: Arrancar la API compilada
+        run: node dist/src/main.js > server.log 2>&1 &
+
+      - name: Prueba de humo
+        run: node scripts/smoke.mjs
+        env:
+          BASE_URL: http://127.0.0.1:3000
+
+      - name: Log de la API
+        if: failure()
+        run: cat server.log

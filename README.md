@@ -93,7 +93,10 @@ test/                                      pruebas e2e
 
 ## CI y despliegue
 
-- **GitHub Actions** (`.github/workflows/ci-cd.yml`) instala, genera el cliente de Prisma, compila y ejecuta las pruebas en cada push y PR a `main` y `develop`.
+- **GitHub Actions** (`.github/workflows/ci-cd.yml`) corre en cada push y PR a `main` y `develop`, con dos jobs:
+  - *Pruebas*: `npm ci`, `npm run build` (el mismo comando que ejecuta Vercel, sin generar Prisma antes) y las pruebas unitarias y e2e.
+  - *Build de producción y prueba de humo*: levanta un PostgreSQL, ejecuta el build con `VERCEL_ENV=production` (genera el cliente y aplica las migraciones en una base vacía), arranca la API compilada y ejecuta `scripts/smoke.mjs`: crea datos, ejecuta una petición REST y comprueba que quede en el historial. En local: `BASE_URL=http://127.0.0.1:3000 node scripts/smoke.mjs` con la API en marcha.
+  - Para que frenen un despliegue defectuoso, en GitHub (*Settings → Rules*) exige que pasen estos jobs antes de hacer merge a `main`.
 - **Vercel** despliega con su integración de GitHub (producción desde `main`, previews en PR), con la base de datos en Neon. Los pasos están en [DESPLIEGUE.md](DESPLIEGUE.md).
 
 > APICheck ejecuta peticiones a cualquier URL que se le indique y no tiene autenticación propia: no lo expongas públicamente sin protección.
