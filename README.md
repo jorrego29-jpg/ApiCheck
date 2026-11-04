@@ -1,98 +1,99 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# APICheck — API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Backend de **APICheck**, una aplicación tipo Postman para probar servicios **REST** y **SOAP**. Guarda los workspaces, colecciones, peticiones y entornos, ejecuta las peticiones y registra cada ejecución en un historial.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+El cliente web está en el repo [ApiCheckClient](https://github.com/jorrego29-jpg/ApiCheckClient).
 
-## Description
+## Stack
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- [NestJS](https://nestjs.com) 11 (TypeScript)
+- [Prisma](https://www.prisma.io) 7 con PostgreSQL (adaptador `pg`)
+- `axios` para las peticiones REST y `soap` para WSDL y sobres SOAP
+- Jest para las pruebas
 
-## Project setup
+## Requisitos
+
+- Node.js 22 o superior
+- Una base de datos PostgreSQL accesible
+
+## Puesta en marcha
 
 ```bash
-$ npm install
+npm install
+cp .env.example .env        # y ajusta los valores
+npx prisma migrate deploy   # crea las tablas (en desarrollo también sirve `npx prisma migrate dev`)
+npm run start:dev           # http://localhost:3000, con recarga automática
 ```
 
-## Compile and run the project
+### Variables de entorno
+
+| Variable | Descripción | Por defecto |
+| --- | --- | --- |
+| `DATABASE_URL` | Cadena de conexión de PostgreSQL | — (obligatoria) |
+| `PORT` | Puerto HTTP | `3000` |
+| `CORS_ORIGIN` | Orígenes permitidos, separados por comas | `http://localhost:4200` |
+
+## Scripts
+
+| Comando | Qué hace |
+| --- | --- |
+| `npm run start:dev` | Arranca en modo desarrollo con recarga |
+| `npm run build` | Genera el cliente de Prisma y compila a `dist/` (ver [DESPLIEGUE.md](DESPLIEGUE.md) para las migraciones en Vercel) |
+| `npm run start:prod` | Arranca la versión compilada |
+| `npm test` | Pruebas unitarias |
+| `npm run test:cov` | Pruebas unitarias con cobertura |
+| `npm run lint` | ESLint (con `--fix`) |
+
+## Pruebas
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm test                                                    # unitarias
+npx jest --config ./test/jest-e2e.json phase0-backend       # e2e con Prisma simulado
 ```
 
-## Run tests
+La suite e2e de `phase0-backend` no necesita base de datos ni red. `test/app.e2e-spec.ts` es la plantilla de Nest y sí exige una base real, por eso se ejecuta aparte.
 
-```bash
-# unit tests
-$ npm run test
+## API
 
-# e2e tests
-$ npm run test:e2e
+Sin prefijo (`GET /`, `POST /execution/run`…). Devuelve `Hello World!` en `GET /`, que el cliente usa para comprobar la conexión.
 
-# test coverage
-$ npm run test:cov
+| Recurso | Rutas |
+| --- | --- |
+| Workspaces | `POST /workspaces`, `GET /workspaces`, `GET /workspaces/:id` |
+| Colecciones | `POST /collections`, `GET /collections?workspaceId=`, `GET /collections/:id/tree`, `PUT` y `DELETE /collections/:id` |
+| Carpetas | `POST /collections/folders`, `PUT` y `DELETE /collections/folders/:id` |
+| Peticiones | `POST /collections/requests`, `GET`, `PUT` y `DELETE /collections/requests/:id` |
+| Entornos | `POST /environments`, `GET /environments?workspaceId=`, `GET`, `PUT` y `DELETE /environments/:id` |
+| Variables | `POST /environments/:id/variables`, `PUT` y `DELETE /environments/variables/:id` |
+| Ejecución | `POST /execution/run`, `GET /execution/soap/inspect-wsdl?url=` |
+| Historial | `GET /history?workspaceId=&requestId=&limit=`, `GET /history/:id` |
+
+### Ejecutar una petición
+
+`POST /execution/run` recibe el protocolo (`REST` o `SOAP`), la URL, los headers, el cuerpo y, opcionalmente, `environmentId`, `workspaceId` y `variables`.
+
+- Las `{{variables}}` de la URL, los headers y el cuerpo se sustituyen con las del entorno global del workspace, las del entorno elegido y las enviadas en `variables`, en ese orden de prioridad creciente.
+- En **SOAP** con `wsdlUrl` la operación se invoca vía WSDL (`soapAction` es el nombre de la operación y `body` los argumentos). Sin `wsdlUrl` se envía el envelope XML tal cual al endpoint.
+- Un fallo de red del destino no es un error HTTP: la respuesta trae `error: true` y el mensaje.
+- Cada ejecución queda en el historial con la URL, el estado, los headers, el cuerpo de la respuesta, la duración y el tamaño. `GET /history` no devuelve los cuerpos; `GET /history/:id` sí.
+
+## Estructura
+
+```text
+src/
+  workspaces/ collections/ environments/   CRUD de datos
+  execution/                               ejecución REST/SOAP, parser de WSDL, variables
+  history/                                 historial de ejecuciones
+  prisma/                                  PrismaService
+  app.setup.ts                             CORS y validación global (compartido con las pruebas)
+prisma/                                    schema y migraciones
+scripts/build.mjs                          build (Prisma + migraciones en Vercel + Nest)
+test/                                      pruebas e2e
 ```
 
-## Deployment
+## CI y despliegue
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+- **GitHub Actions** (`.github/workflows/ci-cd.yml`) instala, genera el cliente de Prisma, compila y ejecuta las pruebas en cada push y PR a `main` y `develop`.
+- **Vercel** despliega con su integración de GitHub (producción desde `main`, previews en PR), con la base de datos en Neon. Los pasos están en [DESPLIEGUE.md](DESPLIEGUE.md).
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+> APICheck ejecuta peticiones a cualquier URL que se le indique y no tiene autenticación propia: no lo expongas públicamente sin protección.
