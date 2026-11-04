@@ -85,21 +85,27 @@ export class ExecutionService {
             ? resolvedBody
             : JSON.stringify(resolvedBody),
           resolvedSoapAction,
+          resolvedHeaders,
         );
       }
     } else {
       throw new BadRequestException(`Protocolo no soportado: ${dto.protocol}`);
     }
 
+    // Las cabeceras que de verdad salieron (en SOAP incluyen Content-Type y SOAPAction) y no viajan en `response`.
+    const sentHeaders = responseResult.requestHeaders ?? resolvedHeaders;
+    delete responseResult.requestHeaders;
+    const sentMethod = dto.method ?? (dto.protocol === "SOAP" ? "POST" : undefined);
+
     // 3. Guardar la ejecución en el historial (Prisma)
     await this.logHistory({
       requestId: dto.requestId,
       executedUrl: resolvedUrl,
-      method: dto.method || "POST",
+      method: sentMethod || "POST",
       status: responseResult.status || 0,
       statusText:
         responseResult.statusText || (responseResult.error ? "ERROR" : "OK"),
-      requestHeaders: resolvedHeaders,
+      requestHeaders: sentHeaders,
       responseHeaders: responseResult.headers || {},
       responseBody: JSON.stringify(
         responseResult.data || responseResult.message || "",
@@ -111,8 +117,8 @@ export class ExecutionService {
     return {
       request: {
         url: resolvedUrl,
-        method: dto.method,
-        headers: resolvedHeaders,
+        method: sentMethod,
+        headers: sentHeaders,
         params: resolvedParams,
         body: resolvedBody,
       },
@@ -140,8 +146,8 @@ export class ExecutionService {
           method: logData.method,
           status: logData.status,
           statusText: logData.statusText,
-          requestHeaders: logData.requestHeaders,
-          responseHeaders: logData.responseHeaders,
+          requestHeaders: toPlainJson(logData.requestHeaders),
+          responseHeaders: toPlainJson(logData.responseHeaders),
           responseBody: logData.responseBody,
           durationMs: logData.durationMs,
           sizeBytes: logData.sizeBytes,
@@ -150,5 +156,17 @@ export class ExecutionService {
     } catch (error) {
       console.error("Error al registrar el historial de ejecución:", error);
     }
+  }
+}
+
+/**
+ * Las cabeceras de axios llegan como una instancia de AxiosHeaders, no como un objeto plano, y
+ * Prisma no las acepta como Json: sin esto la ejecución se respondía bien pero no quedaba en el historial.
+ */
+function toPlainJson(value: unknown): object {
+  try {
+    return JSON.parse(JSON.stringify(value ?? {})) as object;
+  } catch {
+    return {};
   }
 }

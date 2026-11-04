@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import * as soap from 'soap';
 import { firstValueFrom } from 'rxjs';
+import { SOAP_12_ENVELOPE_NS } from './wsdl-parser.service';
 
 @Injectable()
 export class SoapExecutorService {
@@ -44,19 +45,22 @@ export class SoapExecutorService {
   }
 
   // Modo 2: Envío de XML Envelope directo
-  async executeRawEnvelope(endpointUrl: string, xmlEnvelope: string, soapAction?: string) {
+  async executeRawEnvelope(
+    endpointUrl: string,
+    xmlEnvelope: string,
+    soapAction?: string,
+    customHeaders: Record<string, string> = {},
+  ) {
     const startTime = Date.now();
-    const headers: Record<string, string> = {
-      'Content-Type': 'text/xml;charset=UTF-8',
-    };
-    if (soapAction) {
-      headers['SOAPAction'] = `"${soapAction}"`;
-    }
+    const headers = this.buildHeaders(xmlEnvelope, soapAction, customHeaders);
 
     try {
       const response = await firstValueFrom(
         this.httpService.post(endpointUrl, xmlEnvelope, {
           headers,
+          // El XML se devuelve tal cual: sin intentar leerlo como JSON.
+          responseType: 'text',
+          transformResponse: (data) => data,
           validateStatus: () => true,
         }),
       );
@@ -68,6 +72,7 @@ export class SoapExecutorService {
         statusText: response.statusText,
         headers: response.headers,
         data: response.data, // XML devuelto
+        requestHeaders: headers,
         metrics: {
           timeMs: durationMs,
           sizeBytes: Buffer.byteLength(String(response.data || ''), 'utf8'),
@@ -77,8 +82,34 @@ export class SoapExecutorService {
       return {
         error: true,
         message: error?.message ?? String(error),
+        requestHeaders: headers,
         metrics: { timeMs: Date.now() - startTime, sizeBytes: 0 },
       };
     }
+  }
+
+  /**
+   * SOAP 1.1 va como text/xml con la cabecera SOAPAction; SOAP 1.2 como application/soap+xml con la
+   * acción dentro del Content-Type. Lo que el usuario escribió a mano en Headers manda sobre eso.
+   */
+  buildHeaders(
+    xmlEnvelope: string,
+    soapAction?: string,
+    customHeaders: Record<string, string> = {},
+  ): Record<string, string> {
+    const action = (soapAction ?? '').trim().replace(/^"(.*)"$/, '$1');
+    const headers: Record<string, string> = xmlEnvelope.includes(SOAP_12_ENVELOPE_NS)
+      ? {
+          'Content-Type': `application/soap+xml;charset=UTF-8${action ? `;action="${action}"` : ''}`,
+        }
+      : { 'Content-Type': 'text/xml;charset=UTF-8', SOAPAction: `"${action}"` };
+
+    for (const [name, value] of Object.entries(customHeaders)) {
+      for (const existing of Object.keys(headers)) {
+        if (existing.toLowerCase() === name.toLowerCase()) delete headers[existing];
+      }
+      headers[name] = value;
+    }
+    return headers;
   }
 }

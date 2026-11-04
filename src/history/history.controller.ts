@@ -7,8 +7,12 @@ export class HistoryController {
   constructor(private readonly historyService: HistoryService) {}
 
   @Get()
-  findAll(@Query('requestId') requestId?: string, @Query('limit') limit?: string) {
-    return this.historyService.findAll(requestId, limit ? Number(limit) : undefined);
+  findAll(
+    @Query('requestId') requestId?: string,
+    @Query('limit') limit?: string,
+    @Query('workspaceId') workspaceId?: string,
+  ) {
+    return this.historyService.findAll(requestId, limit ? Number(limit) : undefined, workspaceId);
   }
 
   @Get(':id')

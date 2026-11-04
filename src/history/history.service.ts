@@ -11,12 +11,16 @@ export class HistoryService {
 
   /**
    * Lista las ejecuciones más recientes. No incluye cuerpo ni headers de la respuesta
-   * (pueden ser pesados): para eso está findOne().
+   * (pueden ser pesados): para eso está findOne(). Con `workspaceId` solo salen las ejecuciones de
+   * peticiones de ese workspace.
    */
-  findAll(requestId?: string, limit?: number) {
+  findAll(requestId?: string, limit?: number, workspaceId?: string) {
     const take = Math.min(Math.max(Math.trunc(limit ?? DEFAULT_LIMIT) || DEFAULT_LIMIT, 1), MAX_LIMIT);
     return this.prisma.historyLog.findMany({
-      where: requestId ? { requestId } : undefined,
+      where: {
+        ...(requestId ? { requestId } : {}),
+        ...(workspaceId ? { request: { collection: { workspaceId } } } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       take,
       select: {
