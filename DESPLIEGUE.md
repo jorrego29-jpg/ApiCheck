@@ -13,7 +13,7 @@ Los workflows de GitHub Actions solo prueban y compilan. El despliegue lo hace l
 
 1. En Vercel: **Add New → Project**, importa el repo `ApiCheck`. Deja el directorio raíz como está; el framework debe aparecer como NestJS.
 2. Antes de pulsar *Deploy*, ve a **Storage → Create Database → Neon** (Marketplace) y conéctala a este proyecto para *Production* (y *Preview*, si quieres que los previews tengan su propia rama de base de datos). Neon añade `DATABASE_URL` y `DATABASE_URL_UNPOOLED` como variables de entorno.
-3. Despliega. El build ejecuta `npm run vercel-build` (`scripts/vercel-build.mjs`): genera el cliente de Prisma, aplica las migraciones **solo en producción** (con la conexión directa, no la del pooler) y compila Nest.
+3. Despliega. El build ejecuta `npm run build` (`scripts/build.mjs`): genera el cliente de Prisma, aplica las migraciones **solo en producción de Vercel** (con la conexión directa, no la del pooler) y compila Nest. En local y en el CI solo genera y compila.
 4. Anota el dominio de producción del proyecto (por ejemplo `https://apicheck-api.vercel.app`). Prueba `GET /`: debe responder `Hello World!`.
 
 ## 2. Frontend (`ApiCheckClient`)
