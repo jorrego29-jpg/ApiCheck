@@ -1,6 +1,6 @@
 // src/execution/services/rest-executor.service.ts
 import { Injectable } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
+import { HttpService } from '../http.service';
 import { firstValueFrom } from 'rxjs';
 
 export interface RestRequestDto {

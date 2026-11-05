@@ -1,7 +1,7 @@
 // Pruebas e2e de la fase 0 del backend. Prisma y axios están simulados: no requieren base de datos ni red.
 import { Test } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
+import { HttpService } from './../src/execution/http.service';
 import { Prisma } from '@prisma/client';
 import { of } from 'rxjs';
 import request from 'supertest';
@@ -9,15 +9,6 @@ import * as soap from 'soap';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma/prisma.service';
 import { configureApp } from './../src/app.setup';
-
-// @nestjs/axios v12 es solo ESM y Jest (CommonJS) no puede cargarlo: se sustituye por un módulo equivalente.
-jest.mock('@nestjs/axios', () => {
-  const { Module } = jest.requireActual('@nestjs/common');
-  class HttpService {}
-  class HttpModule {}
-  Module({ providers: [HttpService], exports: [HttpService] })(HttpModule);
-  return { HttpModule, HttpService };
-});
 
 jest.mock('soap', () => ({
   createClientAsync: jest.fn().mockRejectedValue(new Error('boom')),

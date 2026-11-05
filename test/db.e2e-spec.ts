@@ -6,7 +6,7 @@
 // campos Json (la regresión de AxiosHeaders) y consultas con relaciones (historial por workspace).
 import { Test } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
+import { HttpService } from './../src/execution/http.service';
 import { AxiosHeaders } from 'axios';
 import { of } from 'rxjs';
 import request from 'supertest';
@@ -14,14 +14,6 @@ import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma/prisma.service';
 import { configureApp } from './../src/app.setup';
 
-// @nestjs/axios v12 es solo ESM y Jest (CommonJS) no puede cargarlo: se sustituye por un módulo equivalente.
-jest.mock('@nestjs/axios', () => {
-  const { Module } = jest.requireActual('@nestjs/common');
-  class HttpService {}
-  class HttpModule {}
-  Module({ providers: [HttpService], exports: [HttpService] })(HttpModule);
-  return { HttpModule, HttpService };
-});
 
 jest.setTimeout(30000);
 
