@@ -1,6 +1,6 @@
 // src/execution/services/soap-executor.service.ts
 import { Injectable } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
+import { HttpService } from '../http.service';
 import * as soap from 'soap';
 import { firstValueFrom } from 'rxjs';
 import { SOAP_12_ENVELOPE_NS } from './wsdl-parser.service';

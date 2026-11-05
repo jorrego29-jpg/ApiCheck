@@ -5,14 +5,6 @@ import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 
 // Necesita una base de datos real (Prisma se conecta al arrancar): la ejecuta el job `smoke` del CI.
-// @nestjs/axios v12 es solo ESM y Jest (CommonJS) no puede cargarlo: se sustituye por un módulo equivalente.
-jest.mock('@nestjs/axios', () => {
-  const { Module } = jest.requireActual('@nestjs/common');
-  class HttpService {}
-  class HttpModule {}
-  Module({ providers: [HttpService], exports: [HttpService] })(HttpModule);
-  return { HttpModule, HttpService };
-});
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;

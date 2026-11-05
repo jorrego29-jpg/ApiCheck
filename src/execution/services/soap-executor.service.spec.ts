@@ -1,8 +1,5 @@
 import { of, throwError } from 'rxjs';
 
-// @nestjs/axios es ESM puro y jest no lo carga; aquí solo hace falta el nombre de la clase.
-jest.mock('@nestjs/axios', () => ({ HttpService: class {} }));
-
 import { SoapExecutorService } from './soap-executor.service';
 
 const ENVELOPE_11 = '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"/>';

@@ -21,6 +21,14 @@ if (process.env.VERCEL_ENV === 'production') {
   // Las migraciones deben ir por la conexión directa: el pooler de Neon (pgbouncer) no soporta
   // bien los bloqueos que usa `migrate`. La integración de Neon la expone como DATABASE_URL_UNPOOLED.
   const direct = process.env.DATABASE_URL_UNPOOLED || process.env.POSTGRES_URL_NON_POOLING;
+  if (!direct && !process.env.DATABASE_URL) {
+    console.error(
+      '\n✗ Build de producción sin base de datos: no existe DATABASE_URL_UNPOOLED ni DATABASE_URL.\n' +
+        '  En Vercel: Storage → tu base de Neon → Connect Project → este proyecto, con "Production" marcado,\n' +
+        '  y vuelve a desplegar. Revisa en Settings → Environment Variables que aparezcan en Production.\n',
+    );
+    process.exit(1);
+  }
   run(['prisma', 'migrate', 'deploy'], direct ? { DATABASE_URL: direct } : {});
 } else {
   console.log(`VERCEL_ENV=${process.env.VERCEL_ENV ?? '(no definido)'}: se omiten las migraciones.`);
