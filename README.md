@@ -32,6 +32,7 @@ npm run start:dev           # http://localhost:3000, con recarga automática
 | `DATABASE_URL` | Cadena de conexión de PostgreSQL | — (obligatoria) |
 | `PORT` | Puerto HTTP | `3000` |
 | `CORS_ORIGIN` | Orígenes permitidos, separados por comas | `http://localhost:4200` |
+| `BODY_LIMIT` | Tamaño máximo del cuerpo de una petición a la API (más allá responde 413). En Vercel el tope real es 4,5 MB | `10mb` |
 
 ## Scripts
 
@@ -74,6 +75,7 @@ Sin prefijo (`GET /`, `POST /execution/run`…). Devuelve `Hello World!` en `GET
 
 - Las `{{variables}}` de la URL, los headers y el cuerpo se sustituyen con las del entorno global del workspace, las del entorno elegido y las enviadas en `variables`, en ese orden de prioridad creciente.
 - En **SOAP** con `wsdlUrl` la operación se invoca vía WSDL (`soapAction` es el nombre de la operación y `body` los argumentos). Sin `wsdlUrl` se envía el envelope XML tal cual al endpoint.
+- `ignoreSsl: true` no verifica el certificado TLS del destino (útil con certificados autofirmados de desarrollo, como el de .NET en `https://localhost`). `GET /execution/soap/inspect-wsdl` acepta `ignoreSsl=true` en la query.
 - Un fallo de red del destino no es un error HTTP: la respuesta trae `error: true` y el mensaje.
 - Cada ejecución queda en el historial con la URL, el estado, los headers, el cuerpo de la respuesta, la duración y el tamaño. `GET /history` no devuelve los cuerpos; `GET /history/:id` sí.
 

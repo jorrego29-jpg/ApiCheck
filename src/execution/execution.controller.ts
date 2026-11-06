@@ -17,7 +17,7 @@ export class ExecutionController {
   }
 
   @Get('soap/inspect-wsdl')
-  async inspectWsdl(@Query('url') wsdlUrl: string) {
-    return await this.wsdlParserService.inspectWsdl(wsdlUrl);
+  async inspectWsdl(@Query('url') wsdlUrl: string, @Query('ignoreSsl') ignoreSsl?: string) {
+    return await this.wsdlParserService.inspectWsdl(wsdlUrl, ignoreSsl === 'true');
   }
 }

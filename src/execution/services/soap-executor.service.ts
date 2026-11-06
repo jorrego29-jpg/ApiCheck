@@ -1,6 +1,6 @@
 // src/execution/services/soap-executor.service.ts
 import { Injectable } from '@nestjs/common';
-import { HttpService } from '../http.service';
+import { HttpService, insecureAgent } from '../http.service';
 import * as soap from 'soap';
 import { firstValueFrom } from 'rxjs';
 import { SOAP_12_ENVELOPE_NS } from './wsdl-parser.service';
@@ -10,16 +10,25 @@ export class SoapExecutorService {
   constructor(private readonly httpService: HttpService) {}
 
   // Modo 1: Consumir vía WSDL dinámico
-  async executeFromWsdl(wsdlUrl: string, methodName: string, args: Record<string, any>) {
+  async executeFromWsdl(
+    wsdlUrl: string,
+    methodName: string,
+    args: Record<string, any>,
+    ignoreSsl = false,
+  ) {
     const startTime = Date.now();
+    // `wsdl_options` cubre la descarga del WSDL (y sus imports); el segundo argumento, la llamada a la operación.
+    const tls = ignoreSsl ? { httpsAgent: insecureAgent } : {};
     try {
-      const client = await soap.createClientAsync(wsdlUrl);
+      // disableCache: node-soap guarda cada WSDL por URL hasta reiniciar; sin esto un WSDL descargado con
+      // ignoreSsl se serviría después aunque la petición no lo pida, y un WSDL editado no se recargaría.
+      const client = await soap.createClientAsync(wsdlUrl, { wsdl_options: tls, disableCache: true });
 
       if (typeof client[`${methodName}Async`] !== 'function') {
         throw new Error(`El método ${methodName} no existe en el WSDL.`);
       }
 
-      const [result] = await client[`${methodName}Async`](args);
+      const [result] = await client[`${methodName}Async`](args, tls);
       const durationMs = Date.now() - startTime;
       const dataString = JSON.stringify(result ?? '');
 
@@ -50,6 +59,7 @@ export class SoapExecutorService {
     xmlEnvelope: string,
     soapAction?: string,
     customHeaders: Record<string, string> = {},
+    ignoreSsl = false,
   ) {
     const startTime = Date.now();
     const headers = this.buildHeaders(xmlEnvelope, soapAction, customHeaders);
@@ -58,6 +68,7 @@ export class SoapExecutorService {
       const response = await firstValueFrom(
         this.httpService.post(endpointUrl, xmlEnvelope, {
           headers,
+          httpsAgent: ignoreSsl ? insecureAgent : undefined,
           // El XML se devuelve tal cual: sin intentar leerlo como JSON.
           responseType: 'text',
           transformResponse: (data) => data,

@@ -59,6 +59,7 @@ export class ExecutionService {
         headers: resolvedHeaders,
         params: resolvedParams,
         body: resolvedBody,
+        ignoreSsl: dto.ignoreSsl,
       });
     } else if (dto.protocol === "SOAP") {
       if (dto.wsdlUrl) {
@@ -70,6 +71,7 @@ export class ExecutionService {
           resolvedWsdl,
           dto.soapAction || "",
           resolvedBody,
+          dto.ignoreSsl,
         );
       } else {
         const resolvedSoapAction = dto.soapAction
@@ -86,6 +88,7 @@ export class ExecutionService {
             : JSON.stringify(resolvedBody),
           resolvedSoapAction,
           resolvedHeaders,
+          dto.ignoreSsl,
         );
       }
     } else {

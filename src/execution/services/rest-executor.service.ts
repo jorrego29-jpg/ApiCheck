@@ -1,6 +1,6 @@
 // src/execution/services/rest-executor.service.ts
 import { Injectable } from '@nestjs/common';
-import { HttpService } from '../http.service';
+import { HttpService, insecureAgent } from '../http.service';
 import { firstValueFrom } from 'rxjs';
 
 export interface RestRequestDto {
@@ -9,6 +9,7 @@ export interface RestRequestDto {
   headers?: Record<string, string>;
   params?: Record<string, string>;
   body?: any;
+  ignoreSsl?: boolean;
 }
 
 @Injectable()
@@ -25,6 +26,7 @@ export class RestExecutorService {
           headers: dto.headers,
           params: dto.params,
           data: dto.body,
+          httpsAgent: dto.ignoreSsl ? insecureAgent : undefined,
           validateStatus: () => true, // Evita que Axios lance excepción en estados != 2xx
         }),
       );

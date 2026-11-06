@@ -1,5 +1,5 @@
 // src/execution/dto/execute-request.dto.ts
-import { IsIn, IsObject, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsIn, IsObject, IsOptional, IsString } from 'class-validator';
 
 export const EXECUTION_PROTOCOLS = ['REST', 'SOAP'] as const;
 export const EXECUTION_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'] as const;
@@ -39,6 +39,11 @@ export class ExecuteRequestDto {
   @IsString()
   @IsOptional()
   wsdlUrl?: string;
+
+  // No verificar el certificado TLS del destino (certificados autofirmados de desarrollo)
+  @IsBoolean()
+  @IsOptional()
+  ignoreSsl?: boolean;
 
   // Variables activas del entorno seleccionado
   @IsObject()
