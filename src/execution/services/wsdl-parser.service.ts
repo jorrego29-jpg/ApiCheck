@@ -1,6 +1,7 @@
 // src/execution/services/wsdl-parser.service.ts
 import { Injectable, BadRequestException } from '@nestjs/common';
 import * as soap from 'soap';
+import { insecureAgent } from '../http.service';
 
 export type SoapVersion = '1.1' | '1.2';
 
@@ -36,9 +37,12 @@ export class WsdlParserService {
   /**
    * Lee un WSDL desde una URL y extrae los servicios, puertos y métodos disponibles.
    */
-  async inspectWsdl(wsdlUrl: string) {
+  async inspectWsdl(wsdlUrl: string, ignoreSsl = false) {
     try {
-      const client = await soap.createClientAsync(wsdlUrl);
+      const client = await soap.createClientAsync(wsdlUrl, {
+        wsdl_options: ignoreSsl ? { httpsAgent: insecureAgent } : {},
+        disableCache: true, // ver soap-executor.service.ts
+      });
       const description = client.describe();
       const wsdl = (client as any).wsdl;
       const definitions = wsdl?.definitions ?? {};

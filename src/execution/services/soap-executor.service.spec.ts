@@ -76,6 +76,16 @@ describe('SoapExecutorService', () => {
       expect(result).not.toHaveProperty('error');
     });
 
+    it('only skips TLS verification when ignoreSsl is asked for', async () => {
+      post.mockReturnValue(of({ status: 200, statusText: 'OK', headers: {}, data: '<ok/>' }));
+
+      await service.executeRawEnvelope('https://x/svc', ENVELOPE_11);
+      await service.executeRawEnvelope('https://x/svc', ENVELOPE_11, undefined, {}, true);
+
+      expect(post.mock.calls[0][2].httpsAgent).toBeUndefined();
+      expect(post.mock.calls[1][2].httpsAgent.options.rejectUnauthorized).toBe(false);
+    });
+
     it('reports a network failure like the REST executor does', async () => {
       post.mockReturnValue(throwError(() => new Error('getaddrinfo ENOTFOUND nope.test')));
 
