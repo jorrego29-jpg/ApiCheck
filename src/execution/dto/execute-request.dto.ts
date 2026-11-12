@@ -1,8 +1,34 @@
 // src/execution/dto/execute-request.dto.ts
-import { IsBoolean, IsIn, IsObject, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsObject,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 
 export const EXECUTION_PROTOCOLS = ['REST', 'SOAP'] as const;
 export const EXECUTION_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'] as const;
+
+/** Un campo de multipart/form-data. Con `fileName` es un archivo y `value` trae su contenido en base64. */
+export class FormDataFieldDto {
+  @IsString()
+  key: string;
+
+  @IsString()
+  value: string;
+
+  @IsString()
+  @IsOptional()
+  fileName?: string;
+
+  @IsString()
+  @IsOptional()
+  contentType?: string;
+}
 
 export class ExecuteRequestDto {
   @IsString()
@@ -30,6 +56,13 @@ export class ExecuteRequestDto {
   // JSON, XML (string) u otro contenido: se valida solo que sea opcional.
   @IsOptional()
   body?: any;
+
+  // Solo REST: si viene, la petición sale como multipart/form-data y `body` se ignora.
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => FormDataFieldDto)
+  @IsOptional()
+  formData?: FormDataFieldDto[];
 
   // Datos específicos SOAP
   @IsString()
