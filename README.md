@@ -74,6 +74,7 @@ Sin prefijo (`GET /`, `POST /execution/run`…). Devuelve `Hello World!` en `GET
 `POST /execution/run` recibe el protocolo (`REST` o `SOAP`), la URL, los headers, el cuerpo y, opcionalmente, `environmentId`, `workspaceId` y `variables`.
 
 - Las `{{variables}}` de la URL, los headers y el cuerpo se sustituyen con las del entorno global del workspace, las del entorno elegido y las enviadas en `variables`, en ese orden de prioridad creciente.
+- En **REST**, `formData` (lista de `{ key, value }`) envía la petición como `multipart/form-data` en lugar de `body`. Un archivo es `{ key, value, fileName, contentType? }` con el contenido en base64 en `value`; al viajar dentro del JSON cuenta para `BODY_LIMIT`.
 - En **SOAP** con `wsdlUrl` la operación se invoca vía WSDL (`soapAction` es el nombre de la operación y `body` los argumentos). Sin `wsdlUrl` se envía el envelope XML tal cual al endpoint.
 - `ignoreSsl: true` no verifica el certificado TLS del destino (útil con certificados autofirmados de desarrollo, como el de .NET en `https://localhost`). `GET /execution/soap/inspect-wsdl` acepta `ignoreSsl=true` en la query.
 - Un fallo de red del destino no es un error HTTP: la respuesta trae `error: true` y el mensaje.

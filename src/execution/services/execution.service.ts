@@ -42,6 +42,18 @@ export class ExecutionService {
     const resolvedBody = dto.body
       ? this.variableResolver.resolveObject(dto.body, activeVariables)
       : null;
+    // En form-data se resuelven claves y textos; el contenido de un archivo (base64) no se toca.
+    const resolvedFormData =
+      dto.protocol === "REST" && dto.formData
+        ? dto.formData.map((field) => ({
+            ...field,
+            key: this.variableResolver.resolveVariables(field.key, activeVariables),
+            value:
+              field.fileName === undefined
+                ? this.variableResolver.resolveVariables(field.value, activeVariables)
+                : field.value,
+          }))
+        : undefined;
 
     let responseResult: any;
 
@@ -59,6 +71,7 @@ export class ExecutionService {
         headers: resolvedHeaders,
         params: resolvedParams,
         body: resolvedBody,
+        formData: resolvedFormData,
         ignoreSsl: dto.ignoreSsl,
       });
     } else if (dto.protocol === "SOAP") {
@@ -123,7 +136,12 @@ export class ExecutionService {
         method: sentMethod,
         headers: sentHeaders,
         params: resolvedParams,
-        body: resolvedBody,
+        // De un archivo se devuelve el nombre, no su contenido.
+        body: resolvedFormData
+          ? resolvedFormData.map(({ key, value, fileName }) =>
+              fileName === undefined ? { key, value } : { key, fileName },
+            )
+          : resolvedBody,
       },
       response: responseResult,
     };
